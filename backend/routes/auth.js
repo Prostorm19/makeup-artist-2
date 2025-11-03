@@ -18,6 +18,27 @@ const generateToken = (userId) => {
     return jwt.sign({ userId }, process.env.JWT_SECRET, { expiresIn: '7d' });
 };
 
+// @route   POST /api/auth/debug-signup
+// @desc    Debug endpoint - shows exactly what's being sent
+// @access  Public
+router.post('/debug-signup', async (req, res) => {
+    console.log('\n========== DEBUG SIGNUP REQUEST ==========');
+    console.log('Headers:', req.headers);
+    console.log('Body:', req.body);
+    console.log('Body keys:', Object.keys(req.body));
+    console.log('Body values:');
+    for (const [key, value] of Object.entries(req.body)) {
+        console.log(`  ${key}: ${typeof value} = "${value}"`);
+    }
+    console.log('==========================================\n');
+
+    res.json({
+        message: 'Debug info logged to server console',
+        received: req.body,
+        bodyKeys: Object.keys(req.body)
+    });
+});
+
 // @route   POST /api/auth/check-email
 // @desc    Check if email is already registered
 // @access  Public
@@ -141,6 +162,10 @@ router.post('/validate-password', (req, res) => {
 router.post('/signup', validateSignup, async (req, res) => {
     try {
         const { name, email, password, userType } = req.body;
+
+        console.log('=== SIGNUP REQUEST ===');
+        console.log('Request body:', { name, email, password: '***', userType });
+        console.log('Validation passed, proceeding with user creation...');
 
         // Check if user already exists
         const existingUser = await User.findOne({ email: email.toLowerCase().trim() });

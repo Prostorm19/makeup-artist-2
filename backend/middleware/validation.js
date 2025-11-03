@@ -2,22 +2,29 @@ const validator = require('validator');
 
 // Validation middleware for signup
 const validateSignup = (req, res, next) => {
-    const { name, email, password, confirmPassword, userType } = req.body;
+    let { name, email, password, confirmPassword, userType } = req.body;
     const errors = [];
 
+    // Trim and normalize inputs first
+    name = name ? String(name).trim() : '';
+    email = email ? String(email).trim().toLowerCase() : '';
+    password = password ? String(password) : '';
+    userType = userType ? String(userType).trim() : '';
+
+    console.log('=== VALIDATION CHECK ===');
+    console.log('Received data:', { name, email, password: password ? '***' : 'missing', confirmPassword: confirmPassword ? '***' : 'missing', userType });
+
     // Name validation
-    if (!name || !name.trim()) {
+    if (!name) {
         errors.push('Name is required');
-    } else if (name.trim().length < 2) {
+    } else if (name.length < 2) {
         errors.push('Name must be at least 2 characters long');
-    } else if (name.trim().length > 50) {
+    } else if (name.length > 50) {
         errors.push('Name cannot exceed 50 characters');
-    } else if (!/^[a-zA-Z\s]+$/.test(name.trim())) {
-        errors.push('Name can only contain letters and spaces');
     }
 
     // Email validation
-    if (!email || !email.trim()) {
+    if (!email) {
         errors.push('Email is required');
     } else if (!validator.isEmail(email)) {
         errors.push('Please provide a valid email address');
@@ -62,15 +69,21 @@ const validateSignup = (req, res, next) => {
 
     // If there are errors, return them
     if (errors.length > 0) {
+        console.log('❌ Validation FAILED with errors:', errors);
+        console.log('Request body was:', { name, email, password: '***', userType });
         return res.status(400).json({
             error: 'Validation failed',
             details: errors
         });
     }
 
-    // Sanitize inputs
-    req.body.name = name.trim();
-    req.body.email = email.toLowerCase().trim();
+    console.log('✅ Validation PASSED! All checks completed.');
+
+    // Store sanitized values back in req.body
+    req.body.name = name;
+    req.body.email = email;
+    req.body.password = password;
+    req.body.userType = userType;
 
     next();
 };

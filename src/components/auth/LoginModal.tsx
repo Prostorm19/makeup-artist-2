@@ -7,6 +7,8 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Lock, User, Palette, Loader2 } from "lucide-react";
+import { PasswordStrengthMeter, PasswordStrength } from "./PasswordStrengthMeter";
+import { EmailValidation } from "./EmailValidation";
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -16,8 +18,10 @@ interface LoginModalProps {
 const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     const [userEmail, setUserEmail] = useState("");
     const [userPassword, setUserPassword] = useState("");
+    const [userPasswordStrength, setUserPasswordStrength] = useState<PasswordStrength | null>(null);
     const [artistEmail, setArtistEmail] = useState("");
     const [artistPassword, setArtistPassword] = useState("");
+    const [artistPasswordStrength, setArtistPasswordStrength] = useState<PasswordStrength | null>(null);
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
     const { login, signup } = useAuth();
@@ -152,6 +156,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                                         required
                                     />
                                 </div>
+                                {!isLogin && <EmailValidation email={userEmail} />}
                             </div>
 
                             <div className="space-y-2">
@@ -168,9 +173,10 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                                         required
                                     />
                                 </div>
+                                {!isLogin && <PasswordStrengthMeter password={userPassword} onChange={setUserPasswordStrength} />}
                             </div>
 
-                            <Button type="submit" className="w-full btn-luxury" disabled={isLoading}>
+                            <Button type="submit" className="w-full btn-luxury" disabled={isLoading || (!isLogin && !userPasswordStrength?.isValid)}>
                                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isLogin ? "Sign In as Client" : "Create Client Account"}
                             </Button>
@@ -200,6 +206,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                                         required
                                     />
                                 </div>
+                                {!isLogin && <EmailValidation email={artistEmail} />}
                             </div>
 
                             <div className="space-y-2">
@@ -216,9 +223,10 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                                         required
                                     />
                                 </div>
+                                {!isLogin && <PasswordStrengthMeter password={artistPassword} onChange={setArtistPasswordStrength} />}
                             </div>
 
-                            <Button type="submit" className="w-full bg-gradient-to-r from-accent to-primary text-white" disabled={isLoading}>
+                            <Button type="submit" className="w-full bg-gradient-to-r from-accent to-primary text-white" disabled={isLoading || (!isLogin && !artistPasswordStrength?.isValid)}>
                                 {isLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                                 {isLogin ? "Sign In as Artist" : "Create Artist Account"}
                             </Button>
