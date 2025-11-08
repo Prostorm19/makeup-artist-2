@@ -41,6 +41,16 @@ export interface Booking {
     createdAt: string;
 }
 
+export interface Review {
+    id: string;
+    artistId: string;
+    clientName: string;
+    service: string;
+    rating: number;
+    comment: string;
+    date: string;
+}
+
 class DataService {
     private static instance: DataService;
     private storageKey = 'makeup-artist-data';
@@ -59,10 +69,16 @@ class DataService {
             return {
                 artists: [],
                 bookings: [],
+                reviews: [],
                 timeSlots: []
             };
         }
-        return JSON.parse(data);
+        const parsedData = JSON.parse(data);
+        // Ensure reviews array exists
+        if (!parsedData.reviews) {
+            parsedData.reviews = [];
+        }
+        return parsedData;
     }
 
     // Save data to localStorage
@@ -221,6 +237,44 @@ class DataService {
             data.bookings[bookingIndex].status = status;
             this.saveData(data);
         }
+    }
+
+    // Update time slot availability
+    updateSlotAvailability(artistId: string, slotId: string, isAvailable: boolean): void {
+        const data = this.getData();
+        const artistIndex = data.artists.findIndex((a: Artist) => a.id === artistId);
+
+        if (artistIndex !== -1) {
+            const slotIndex = data.artists[artistIndex].timeSlots.findIndex((s: TimeSlot) => s.id === slotId);
+            if (slotIndex !== -1) {
+                data.artists[artistIndex].timeSlots[slotIndex].isAvailable = isAvailable;
+                this.saveData(data);
+            }
+        }
+    }
+
+    // Add review
+    addReview(review: Omit<Review, 'id'>): Review {
+        const data = this.getData();
+        const newReview: Review = {
+            ...review,
+            id: `review-${Date.now()}`
+        };
+
+        if (!data.reviews) {
+            data.reviews = [];
+        }
+
+        data.reviews.push(newReview);
+        this.saveData(data);
+
+        return newReview;
+    }
+
+    // Get reviews for artist
+    getArtistReviews(artistId: string): Review[] {
+        const data = this.getData();
+        return (data.reviews || []).filter((r: Review) => r.artistId === artistId);
     }
 }
 

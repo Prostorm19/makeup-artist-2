@@ -13,7 +13,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/contexts/AuthContext";
-import { dataService, type Artist } from "@/services/dataService";
+import { dataService, type Artist, type Booking as DataServiceBooking } from "@/services/dataService";
 import {
   Calendar,
   Clock,
@@ -40,22 +40,11 @@ interface TimeSlot {
   duration: number;
   service: string;
   price: number;
+  isAvailable: boolean;
 }
 
-interface Booking {
-  id: string;
-  artistName: string;
-  artistPhone: string;
-  artistEmail: string;
-  service: string;
-  date: string;
-  time: string;
-  duration: number;
-  price: number;
-  status: 'pending' | 'confirmed' | 'completed' | 'cancelled';
-  location: string;
-  notes?: string;
-  createdAt: string;
+interface Booking extends DataServiceBooking {
+  location?: string;
 }
 
 interface Review {
@@ -213,50 +202,24 @@ const ClientDashboard = () => {
     setAvailableSlots(allSlots);
   }, [availableArtists]);
 
-  const [myBookings, setMyBookings] = useState<Booking[]>([
-    {
-      id: "1",
-      artistName: "Bella Martinez",
-      artistPhone: "+1 (555) 123-4567",
-      artistEmail: "bella@email.com",
-      service: "Bridal Makeup Trial",
-      date: "2025-11-25",
-      time: "10:00 AM",
-      duration: 2,
-      price: 150,
-      status: "confirmed",
-      location: "Bella Artistry Studio",
-      createdAt: "2025-11-01"
-    },
-    {
-      id: "2",
-      artistName: "Sophie Chen",
-      artistPhone: "+1 (555) 987-6543",
-      artistEmail: "sophie@email.com",
-      service: "Evening Glam",
-      date: "2025-12-02",
-      time: "4:00 PM",
-      duration: 1.5,
-      price: 120,
-      status: "pending",
-      location: "Client's Location",
-      createdAt: "2025-11-01"
-    },
-    {
-      id: "3",
-      artistName: "Bella Martinez",
-      artistPhone: "+1 (555) 123-4567",
-      artistEmail: "bella@email.com",
-      service: "Natural Day Look",
-      date: "2025-10-15",
-      time: "2:00 PM",
-      duration: 1,
-      price: 80,
-      status: "completed",
-      location: "Bella Artistry Studio",
-      createdAt: "2025-10-10"
-    }
-  ]);
+  const [myBookings, setMyBookings] = useState<Booking[]>([]);
+
+  // Load client's bookings from dataService when component mounts and refresh periodically
+  useEffect(() => {
+    const loadBookings = () => {
+      if (user?.id) {
+        const clientBookings = dataService.getClientBookings(user.id);
+        setMyBookings(clientBookings);
+      }
+    };
+
+    loadBookings();
+
+    // Refresh bookings every 2 seconds to catch updates from artist approvals
+    const interval = setInterval(loadBookings, 2000);
+
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
   const [favoriteArtists, setFavoriteArtists] = useState<Artist[]>([]);
 
@@ -273,24 +236,24 @@ const ClientDashboard = () => {
   ]);
 
   const handleBookAppointment = () => {
-    if (selectedTimeSlot) {
-      const newBooking: Booking = {
-        id: Date.now().toString(),
-        artistName: selectedTimeSlot.artistName,
-        artistPhone: "+1 (555) 123-4567",
-        artistEmail: "artist@email.com",
+    if (selectedTimeSlot && user?.id) {
+      const newBooking = dataService.addBooking({
+        artistId: selectedTimeSlot.artistId,
+        clientId: user.id,
+        clientName: user.name || "Anonymous",
+        clientEmail: user.email,
+        clientPhone: "+1 (555) 000-0000",
         service: selectedTimeSlot.service,
         date: selectedTimeSlot.date,
         time: selectedTimeSlot.time,
         duration: selectedTimeSlot.duration,
         price: selectedTimeSlot.price,
         status: "pending",
-        location: bookingForm.location || "To be confirmed",
         notes: bookingForm.notes,
         createdAt: new Date().toISOString()
-      };
+      });
 
-      setMyBookings(prev => [newBooking, ...prev]);
+      setMyBookings(prev => [newBooking as Booking, ...prev]);
       setIsBookingModalOpen(false);
       setSelectedTimeSlot(null);
       setBookingForm({ notes: "", location: "" });
@@ -299,9 +262,21 @@ const ClientDashboard = () => {
 
   const handleSubmitReview = () => {
     if (selectedBookingForReview) {
+      const artist = availableArtists.find(a => a.id === selectedBookingForReview.artistId);
+
+      // Save review to dataService
+      dataService.addReview({
+        artistId: selectedBookingForReview.artistId,
+        clientName: selectedBookingForReview.clientName,
+        service: selectedBookingForReview.service,
+        rating: reviewForm.rating,
+        comment: reviewForm.comment,
+        date: new Date().toLocaleDateString()
+      });
+
       const newReview: Review = {
         id: Date.now().toString(),
-        artistName: selectedBookingForReview.artistName,
+        artistName: artist?.name || "Unknown Artist",
         service: selectedBookingForReview.service,
         rating: reviewForm.rating,
         comment: reviewForm.comment,
@@ -313,6 +288,39 @@ const ClientDashboard = () => {
       setIsReviewModalOpen(false);
       setSelectedBookingForReview(null);
       setReviewForm({ rating: 5, comment: "" });
+    }
+  };
+
+  const handleCompleteBooking = (bookingId: string) => {
+    if (user?.id) {
+      // Get the booking details before updating
+      const booking = myBookings.find(b => b.id === bookingId);
+      if (booking) {
+        // Update booking status to completed
+        dataService.updateBookingStatus(bookingId, 'completed');
+
+        // Find the corresponding time slot and mark it as available again
+        const artistSlots = dataService.getArtistTimeSlots(booking.artistId);
+        const slotToUpdate = artistSlots.find(slot =>
+          slot.date === booking.date &&
+          slot.time === booking.time &&
+          slot.service === booking.service
+        );
+
+        if (slotToUpdate) {
+          // Mark slot as available again
+          dataService.updateSlotAvailability(booking.artistId, slotToUpdate.id, true);
+        }
+
+        // Update local state
+        setMyBookings(prev =>
+          prev.map(b =>
+            b.id === bookingId
+              ? { ...b, status: 'completed' as const }
+              : b
+          )
+        );
+      }
     }
   };
 
@@ -460,11 +468,11 @@ const ClientDashboard = () => {
                       <div key={booking.id} className="flex items-center justify-between p-4 rounded-lg bg-primary/5 border border-primary/10">
                         <div className="flex items-center space-x-4">
                           <Avatar className="w-12 h-12">
-                            <AvatarFallback>{booking.artistName[0]}</AvatarFallback>
+                            <AvatarFallback>{availableArtists.find(a => a.id === booking.artistId)?.name[0] || "A"}</AvatarFallback>
                           </Avatar>
                           <div>
                             <h4 className="font-semibold text-foreground">{booking.service}</h4>
-                            <p className="text-sm text-muted-foreground">with {booking.artistName}</p>
+                            <p className="text-sm text-muted-foreground">with {availableArtists.find(a => a.id === booking.artistId)?.name || "Unknown Artist"}</p>
                             <div className="flex items-center space-x-4 mt-1">
                               <div className="flex items-center text-sm text-muted-foreground">
                                 <Calendar className="w-3 h-3 mr-1" />
@@ -489,6 +497,16 @@ const ClientDashboard = () => {
                           <Badge className={getStatusColor(booking.status)}>
                             {booking.status}
                           </Badge>
+                          {booking.status === 'confirmed' && (
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleCompleteBooking(booking.id)}
+                              className="bg-green-500/10 hover:bg-green-500/20 text-green-700"
+                            >
+                              Complete
+                            </Button>
+                          )}
                           {booking.status === 'completed' && (
                             <Button
                               variant="outline"
@@ -677,7 +695,7 @@ const ClientDashboard = () => {
                                   </DialogHeader>
                                   <div className="space-y-4">
                                     {(() => {
-                                      const artistSlots = availableSlots.filter(slot => slot.artistId === artist.id);
+                                      const artistSlots = availableSlots.filter(slot => slot.artistId === artist.id && slot.isAvailable);
                                       if (artistSlots.length === 0) {
                                         return (
                                           <div className="text-center py-8 text-muted-foreground">
@@ -910,7 +928,7 @@ const ClientDashboard = () => {
                 <div className="space-y-4">
                   <div className="bg-primary/5 p-4 rounded-lg">
                     <h3 className="font-semibold">{selectedBookingForReview.service}</h3>
-                    <p className="text-sm text-muted-foreground">with {selectedBookingForReview.artistName}</p>
+                    <p className="text-sm text-muted-foreground">with {availableArtists.find(a => a.id === selectedBookingForReview.artistId)?.name || "Unknown Artist"}</p>
                     <p className="text-sm text-muted-foreground">{selectedBookingForReview.date}</p>
                   </div>
 

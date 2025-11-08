@@ -43,6 +43,7 @@ const ArtistDashboard = () => {
     const [isAddSlotOpen, setIsAddSlotOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
     const [isBookingDetailsOpen, setIsBookingDetailsOpen] = useState(false);
+    const [isViewingAllReviews, setIsViewingAllReviews] = useState(false);
     const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
     const [bookings, setBookings] = useState<Booking[]>([]);
 
@@ -57,36 +58,49 @@ const ArtistDashboard = () => {
 
     // Initialize data when component mounts or user changes
     useEffect(() => {
-        if (user?.id) {
-            // Initialize artist profile in data service
-            dataService.initializeArtist(user.id, {
-                name: user.name,
-                email: user.email
-            });
+        const loadArtistData = () => {
+            if (user?.id) {
+                // Initialize artist profile in data service
+                dataService.initializeArtist(user.id, {
+                    name: user.name,
+                    email: user.email
+                });
 
-            // Load time slots and bookings
-            const slots = dataService.getArtistTimeSlots(user.id);
-            const artistBookings = dataService.getArtistBookings(user.id);
+                // Load time slots and bookings
+                const slots = dataService.getArtistTimeSlots(user.id);
+                const artistBookings = dataService.getArtistBookings(user.id);
 
-            setTimeSlots(slots);
-            setBookings(artistBookings);
+                setTimeSlots(slots);
+                setBookings(artistBookings);
 
-            // Separate pending bookings and today's schedule
-            const pending = artistBookings.filter(booking => booking.status === 'pending');
-            const today = new Date().toISOString().split('T')[0];
-            const todayBookings = artistBookings.filter(booking =>
-                booking.date === today && booking.status === 'confirmed'
-            );
+                // Separate pending bookings and today's schedule
+                const pending = artistBookings.filter(booking => booking.status === 'pending');
+                const today = new Date().toISOString().split('T')[0];
+                const todayBookings = artistBookings.filter(booking =>
+                    booking.date === today && booking.status === 'confirmed'
+                );
+                const completed = artistBookings.filter(booking => booking.status === 'completed');
 
-            setPendingBookings(pending);
-            setTodaysSchedule(todayBookings);
-        }
+                setPendingBookings(pending);
+                setTodaysSchedule(todayBookings);
+                setCompletedBookings(completed);
+            }
+        };
+
+        loadArtistData();
+
+        // Refresh bookings and slots every 2 seconds to catch client completions
+        const interval = setInterval(loadArtistData, 2000);
+
+        return () => clearInterval(interval);
     }, [user?.id]);
 
     const [pendingBookings, setPendingBookings] = useState<Booking[]>([]);
     const [todaysSchedule, setTodaysSchedule] = useState<Booking[]>([]);
+    const [completedBookings, setCompletedBookings] = useState<Booking[]>([]);
 
-    const [reviews] = useState<Review[]>([
+    // Static reviews to keep as default
+    const staticReviews: Review[] = [
         {
             id: "1",
             clientName: "Rachel Smith",
@@ -111,7 +125,27 @@ const ArtistDashboard = () => {
             comment: "Great attention to detail. The makeup looked perfect under studio lights.",
             date: "2025-10-15"
         }
-    ]);
+    ];
+
+    const [reviews, setReviews] = useState<Review[]>(staticReviews);
+
+    // Load reviews from dataService and combine with static reviews
+    useEffect(() => {
+        const loadReviews = () => {
+            if (user?.id) {
+                const artistReviews = dataService.getArtistReviews(user.id);
+                // Combine dynamic reviews with static reviews (dynamic first, then static)
+                setReviews([...artistReviews, ...staticReviews]);
+            }
+        };
+
+        loadReviews();
+
+        // Refresh reviews every 2 seconds to catch new reviews from clients
+        const interval = setInterval(loadReviews, 2000);
+
+        return () => clearInterval(interval);
+    }, [user?.id]);
 
     const handleAddSlot = () => {
         if (newSlot.date && newSlot.time && newSlot.duration && newSlot.service && newSlot.price && user?.id) {
@@ -135,6 +169,32 @@ const ArtistDashboard = () => {
     };
 
     const handleApproveBooking = (bookingId: string) => {
+        // Update booking status in dataService
+        dataService.updateBookingStatus(bookingId, 'confirmed');
+
+        // Find the booking to get slot details
+        const booking = pendingBookings.find(b => b.id === bookingId);
+        if (booking && user?.id) {
+            // Find and mark the corresponding time slot as unavailable
+            const slotToUpdate = timeSlots.find(slot =>
+                slot.date === booking.date &&
+                slot.time === booking.time &&
+                slot.service === booking.service
+            );
+
+            if (slotToUpdate) {
+                // Update in dataService
+                dataService.updateSlotAvailability(user.id, slotToUpdate.id, false);
+
+                // Update in local state
+                const updatedSlots = timeSlots.map(slot =>
+                    slot.id === slotToUpdate.id ? { ...slot, isAvailable: false } : slot
+                );
+                setTimeSlots(updatedSlots);
+            }
+        }
+
+        // Update pending bookings state
         setPendingBookings(prev =>
             prev.map(booking =>
                 booking.id === bookingId
@@ -145,6 +205,10 @@ const ArtistDashboard = () => {
     };
 
     const handleDeclineBooking = (bookingId: string) => {
+        // Update booking status in dataService
+        dataService.updateBookingStatus(bookingId, 'cancelled');
+
+        // Update pending bookings state
         setPendingBookings(prev =>
             prev.map(booking =>
                 booking.id === bookingId
@@ -399,6 +463,41 @@ const ArtistDashboard = () => {
                                             </div>
                                         ))}
                                     </div>
+
+                                    {/* Completed Bookings Section */}
+                                    {completedBookings.length > 0 && (
+                                        <div className="mt-8 pt-6 border-t border-primary/20">
+                                            <h3 className="text-lg font-semibold mb-4">Completed Bookings</h3>
+                                            <div className="space-y-4">
+                                                {completedBookings.map((booking) => (
+                                                    <div key={booking.id} className="flex items-center justify-between p-4 rounded-lg bg-green-500/5 border border-green-500/20">
+                                                        <div className="flex items-center space-x-4">
+                                                            <Avatar className="w-12 h-12">
+                                                                <AvatarFallback>{booking.clientName[0]}</AvatarFallback>
+                                                            </Avatar>
+                                                            <div>
+                                                                <h4 className="font-semibold text-foreground">{booking.clientName}</h4>
+                                                                <p className="text-sm text-muted-foreground">{booking.service}</p>
+                                                                <div className="flex items-center space-x-4 mt-1">
+                                                                    <div className="flex items-center text-sm text-muted-foreground">
+                                                                        <Calendar className="w-3 h-3 mr-1" />
+                                                                        {booking.date}
+                                                                    </div>
+                                                                    <div className="flex items-center text-sm text-muted-foreground">
+                                                                        <Clock className="w-3 h-3 mr-1" />
+                                                                        {booking.time}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        <Badge className="bg-green-100 text-green-800">
+                                                            completed
+                                                        </Badge>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </CardContent>
                             </Card>
                         </TabsContent>
@@ -544,35 +643,43 @@ const ArtistDashboard = () => {
                                 </CardHeader>
                                 <CardContent>
                                     <div className="space-y-6">
-                                        {reviews.map((review) => (
-                                            <div key={review.id} className="p-4 rounded-lg bg-primary/5 border border-primary/10">
-                                                <div className="flex items-start space-x-4">
-                                                    <Avatar className="w-12 h-12">
-                                                        <AvatarFallback>{review.clientName[0]}</AvatarFallback>
-                                                    </Avatar>
-                                                    <div className="flex-1">
-                                                        <div className="flex items-center justify-between mb-2">
-                                                            <div>
-                                                                <h4 className="font-semibold text-foreground">{review.clientName}</h4>
-                                                                <p className="text-sm text-muted-foreground">{review.service}</p>
-                                                            </div>
-                                                            <div className="flex items-center space-x-2">
-                                                                <div className="flex items-center">
-                                                                    {renderStars(review.rating)}
+                                        {reviews
+                                            .slice(0, isViewingAllReviews ? reviews.length : 3)
+                                            .map((review) => (
+                                                <div key={review.id} className="p-4 rounded-lg bg-primary/5 border border-primary/10">
+                                                    <div className="flex items-start space-x-4">
+                                                        <Avatar className="w-12 h-12">
+                                                            <AvatarFallback>{review.clientName[0]}</AvatarFallback>
+                                                        </Avatar>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center justify-between mb-2">
+                                                                <div>
+                                                                    <h4 className="font-semibold text-foreground">{review.clientName}</h4>
+                                                                    <p className="text-sm text-muted-foreground">{review.service}</p>
                                                                 </div>
-                                                                <span className="text-sm text-muted-foreground">{review.date}</span>
+                                                                <div className="flex items-center space-x-2">
+                                                                    <div className="flex items-center">
+                                                                        {renderStars(review.rating)}
+                                                                    </div>
+                                                                    <span className="text-sm text-muted-foreground">{review.date}</span>
+                                                                </div>
                                                             </div>
+                                                            <p className="text-foreground italic">"{review.comment}"</p>
                                                         </div>
-                                                        <p className="text-foreground italic">"{review.comment}"</p>
                                                     </div>
                                                 </div>
+                                            ))}
+                                        {reviews.length > 3 && (
+                                            <div className="text-center">
+                                                <Button
+                                                    variant="outline"
+                                                    className="btn-luxury"
+                                                    onClick={() => setIsViewingAllReviews(!isViewingAllReviews)}
+                                                >
+                                                    {isViewingAllReviews ? "Show Less Reviews" : `View All Reviews (${reviews.length})`}
+                                                </Button>
                                             </div>
-                                        ))}
-                                        <div className="text-center">
-                                            <Button variant="outline" className="btn-luxury">
-                                                View All Reviews
-                                            </Button>
-                                        </div>
+                                        )}
                                     </div>
                                 </CardContent>
                             </Card>
