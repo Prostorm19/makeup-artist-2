@@ -16,10 +16,13 @@ interface AuthContextType {
     isAuthenticated: boolean;
     isLoading: boolean;
     error: string | null;
+    errorDetails: string[] | null;
     login: (email: string, password: string, type: UserType) => Promise<boolean>;
     signup: (email: string, password: string, type: UserType, name?: string) => Promise<boolean>;
     logout: () => void;
     updateProfile: (updates: Partial<User>) => void;
+    uploadProfileImage: (file: File) => Promise<boolean>;
+    deleteProfileImage: () => Promise<boolean>;
     clearError: () => void;
 }
 
@@ -44,6 +47,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const [userType, setUserType] = useState<UserType>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [errorDetails, setErrorDetails] = useState<string[] | null>(null);
 
     useEffect(() => {
         // Check for existing session on app load
@@ -85,6 +89,9 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
             setUser(userData);
             setUserType(data.user.userType);
+            // Update localStorage with fresh data from backend
+            localStorage.setItem("makeup-artist-user", JSON.stringify(userData));
+            localStorage.setItem("makeup-artist-user-type", data.user.userType);
         } catch (error) {
             console.error("Token verification failed:", error);
             logout();
@@ -94,6 +101,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const login = async (email: string, password: string, type: UserType): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
+        setErrorDetails(null);
 
         try {
             const response = await fetch(`${API_BASE_URL}/auth/login`, {
@@ -112,6 +120,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
             if (!response.ok) {
                 setError(data.error || 'Login failed');
+                setErrorDetails(data.details || null);
                 return false;
             }
 
@@ -135,6 +144,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         } catch (error) {
             console.error("Login error:", error);
             setError("Network error. Please try again.");
+            setErrorDetails(null);
             return false;
         } finally {
             setIsLoading(false);
@@ -144,6 +154,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
     const signup = async (email: string, password: string, type: UserType, name?: string): Promise<boolean> => {
         setIsLoading(true);
         setError(null);
+        setErrorDetails(null);
 
         try {
             const response = await fetch(`${API_BASE_URL}/auth/signup`, {
@@ -163,6 +174,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
 
             if (!response.ok) {
                 setError(data.error || 'Signup failed');
+                setErrorDetails(data.details || null);
                 return false;
             }
 
@@ -186,6 +198,7 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         } catch (error) {
             console.error("Signup error:", error);
             setError("Network error. Please try again.");
+            setErrorDetails(null);
             return false;
         } finally {
             setIsLoading(false);
@@ -235,8 +248,100 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         }
     };
 
+    const uploadProfileImage = async (file: File): Promise<boolean> => {
+        if (!user) return false;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('profileImage', file);
+
+            const token = localStorage.getItem("makeup-artist-token");
+            const response = await fetch(`${API_BASE_URL}/auth/upload-profile-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setError(data.error || 'Image upload failed');
+                return false;
+            }
+
+            // Update user with the full response data
+            const updatedUser: User = {
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.name,
+                type: data.user.userType,
+                profileImage: data.user.profileImage
+            };
+
+            setUser(updatedUser);
+            localStorage.setItem("makeup-artist-user", JSON.stringify(updatedUser));
+            return true;
+        } catch (error) {
+            console.error("Upload profile image error:", error);
+            setError("Network error. Please try again.");
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
+    const deleteProfileImage = async (): Promise<boolean> => {
+        if (!user) return false;
+
+        setIsLoading(true);
+        setError(null);
+
+        try {
+            const token = localStorage.getItem("makeup-artist-token");
+            const response = await fetch(`${API_BASE_URL}/auth/profile-image`, {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                    'Content-Type': 'application/json',
+                },
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setError(data.error || 'Image deletion failed');
+                return false;
+            }
+
+            // Update user with null profileImage
+            const updatedUser: User = {
+                id: data.user.id,
+                email: data.user.email,
+                name: data.user.name,
+                type: data.user.userType,
+                profileImage: null
+            };
+
+            setUser(updatedUser);
+            localStorage.setItem("makeup-artist-user", JSON.stringify(updatedUser));
+            return true;
+        } catch (error) {
+            console.error("Delete profile image error:", error);
+            setError("Network error. Please try again.");
+            return false;
+        } finally {
+            setIsLoading(false);
+        }
+    };
+
     const clearError = () => {
         setError(null);
+        setErrorDetails(null);
     };
 
     const value: AuthContextType = {
@@ -245,10 +350,13 @@ export const AuthProvider = ({ children }: AuthProviderProps) => {
         isAuthenticated: !!user,
         isLoading,
         error,
+        errorDetails,
         login,
         signup,
         logout,
         updateProfile,
+        uploadProfileImage,
+        deleteProfileImage,
         clearError
     };
 

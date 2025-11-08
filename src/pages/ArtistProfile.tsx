@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/contexts/AuthContext";
+import { PhotoUpload } from "@/components/PhotoUpload";
 import {
     Palette,
     Mail,
@@ -23,7 +24,6 @@ import {
     Save,
     X,
     ArrowLeft,
-    Camera,
     Clock,
     DollarSign,
     Award,
@@ -32,6 +32,7 @@ import {
     Image as ImageIcon,
     Plus
 } from "lucide-react";
+import { useEffect } from "react";
 
 const ArtistProfile = () => {
     const { user, updateProfile } = useAuth();
@@ -48,6 +49,15 @@ const ArtistProfile = () => {
         instagram: "",
         website: ""
     });
+
+    // Sync form data when user data changes
+    useEffect(() => {
+        setFormData(prev => ({
+            ...prev,
+            name: user?.name || "",
+            email: user?.email || ""
+        }));
+    }, [user?.name, user?.email]);
 
     const handleSave = () => {
         updateProfile(formData);
@@ -143,19 +153,12 @@ const ArtistProfile = () => {
                             <Card className="glass border-primary/20">
                                 <CardHeader className="text-center">
                                     <div className="relative mx-auto mb-4">
-                                        <Avatar className="w-24 h-24 border-4 border-primary/20">
-                                            <AvatarImage src={user?.profileImage} alt={user?.name} />
-                                            <AvatarFallback className="bg-accent/10 text-accent text-2xl font-bold">
-                                                {getUserInitials(user?.name, user?.email)}
-                                            </AvatarFallback>
-                                        </Avatar>
-                                        <Button
-                                            size="icon"
-                                            variant="secondary"
-                                            className="absolute -bottom-2 -right-2 rounded-full w-8 h-8 bg-accent/10 hover:bg-accent/20"
-                                        >
-                                            <Camera className="w-4 h-4" />
-                                        </Button>
+                                        <PhotoUpload
+                                            key={user?.id}
+                                            currentImage={user?.profileImage}
+                                            userName={user?.name}
+                                            userEmail={user?.email}
+                                        />
                                     </div>
                                     <CardTitle className="text-foreground">{user?.name}</CardTitle>
                                     <CardDescription className="flex items-center justify-center">

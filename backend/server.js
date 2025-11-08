@@ -3,11 +3,19 @@ const mongoose = require('mongoose');
 const cors = require('cors');
 const dotenv = require('dotenv');
 const sanitizeInputs = require('./middleware/sanitize');
+const path = require('path');
+const fs = require('fs');
 
 // Load environment variables
 dotenv.config();
 
 const app = express();
+
+// Create uploads directory if it doesn't exist
+const uploadsDir = path.join(__dirname, 'uploads');
+if (!fs.existsSync(uploadsDir)) {
+    fs.mkdirSync(uploadsDir, { recursive: true });
+}
 
 // Middleware
 app.use(cors({
@@ -30,6 +38,9 @@ app.use(cors({
 app.options('*', cors());
 app.use(express.json({ limit: '10mb' })); // Add size limit for security
 app.use(sanitizeInputs); // Add input sanitization
+
+// Serve uploaded files statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Add request logging middleware for debugging
 app.use((req, res, next) => {

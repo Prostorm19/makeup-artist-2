@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Mail, Lock, User, Palette, Loader2 } from "lucide-react";
 import { PasswordStrengthMeter, PasswordStrength } from "./PasswordStrengthMeter";
 import { EmailValidation } from "./EmailValidation";
+import { ErrorAlert } from "./ErrorAlert";
 
 interface LoginModalProps {
     isOpen: boolean;
@@ -24,7 +25,7 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
     const [artistPasswordStrength, setArtistPasswordStrength] = useState<PasswordStrength | null>(null);
     const [isLogin, setIsLogin] = useState(true);
     const [isLoading, setIsLoading] = useState(false);
-    const { login, signup } = useAuth();
+    const { login, signup, error, errorDetails, clearError } = useAuth();
 
     const handleUserLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -99,6 +100,15 @@ const LoginModal = ({ isOpen, onClose }: LoginModalProps) => {
                         {isLogin ? "Sign in to your account" : "Create your account"}
                     </DialogDescription>
                 </DialogHeader>
+
+                {error && (
+                    <ErrorAlert
+                        title={isLogin ? "Login Failed" : "Registration Failed"}
+                        error={error}
+                        details={errorDetails}
+                        onDismiss={clearError}
+                    />
+                )}
 
                 <div className="flex justify-center mb-4">
                     <div className="flex rounded-lg bg-muted p-1">

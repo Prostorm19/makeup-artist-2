@@ -3,6 +3,7 @@ const jwt = require('jsonwebtoken');
 const validator = require('validator');
 const User = require('../models/User');
 const auth = require('../middleware/auth');
+const upload = require('../middleware/upload');
 const {
     validateSignup,
     validateLogin,
@@ -295,13 +296,21 @@ router.get('/me', auth, async (req, res) => {
             return res.status(404).json({ error: 'User not found' });
         }
 
+        // Build full URL for profile image if it exists
+        let profileImage = user.profileImage;
+        if (profileImage && profileImage.startsWith('/uploads/')) {
+            const protocol = req.protocol;
+            const host = req.get('host');
+            profileImage = `${protocol}://${host}${profileImage}`;
+        }
+
         res.json({
             user: {
                 id: user._id,
                 name: user.name,
                 email: user.email,
                 userType: user.userType,
-                profileImage: user.profileImage,
+                profileImage: profileImage,
                 isVerified: user.isVerified,
                 createdAt: user.createdAt,
                 lastLogin: user.lastLogin
@@ -335,6 +344,14 @@ router.put('/profile', auth, validateProfileUpdate, async (req, res) => {
 
         await user.save();
 
+        // Build full URL for profile image if it exists
+        let fullProfileImage = user.profileImage;
+        if (fullProfileImage && fullProfileImage.startsWith('/uploads/')) {
+            const protocol = req.protocol;
+            const host = req.get('host');
+            fullProfileImage = `${protocol}://${host}${fullProfileImage}`;
+        }
+
         res.json({
             message: 'Profile updated successfully',
             user: {
@@ -342,7 +359,7 @@ router.put('/profile', auth, validateProfileUpdate, async (req, res) => {
                 name: user.name,
                 email: user.email,
                 userType: user.userType,
-                profileImage: user.profileImage,
+                profileImage: fullProfileImage,
                 phone: user.phone
             }
         });
@@ -448,6 +465,108 @@ router.put('/change-password', auth, async (req, res) => {
         res.status(500).json({
             error: 'Server error',
             message: 'Unable to change password. Please try again later.'
+        });
+    }
+});
+
+// @route   POST /api/auth/upload-profile-image
+// @desc    Upload profile image
+// @access  Private
+router.post('/upload-profile-image', auth, upload.single('profileImage'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                error: 'No file uploaded',
+                message: 'Please select an image file to upload'
+            });
+        }
+
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found',
+                message: 'User account no longer exists'
+            });
+        }
+
+        // Store the file path as URL
+        const fileUrl = `/uploads/${req.file.filename}`;
+        user.profileImage = fileUrl;
+        await user.save();
+
+        // Get the full URL for the response
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const fullUrl = `${protocol}://${host}${fileUrl}`;
+
+        res.json({
+            message: 'Profile image uploaded successfully',
+            profileImage: fullUrl,
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                userType: user.userType,
+                profileImage: fullUrl
+            }
+        });
+    } catch (error) {
+        console.error('Upload profile image error:', error);
+        res.status(500).json({
+            error: 'Server error',
+            message: error.message || 'Unable to upload image. Please try again later.'
+        });
+    }
+});
+
+// @route   DELETE /api/auth/profile-image
+// @desc    Delete profile image
+// @access  Private
+router.delete('/profile-image', auth, async (req, res) => {
+    try {
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found',
+                message: 'User account no longer exists'
+            });
+        }
+
+        // If user has a profile image, delete the file
+        if (user.profileImage) {
+            const fs = require('fs');
+            const path = require('path');
+
+            // Extract filename from the stored path (e.g., "/uploads/profile-123.jpg" -> "profile-123.jpg")
+            const filename = user.profileImage.split('/').pop();
+            const filePath = path.join(__dirname, '../uploads', filename);
+
+            // Delete the file if it exists
+            if (fs.existsSync(filePath)) {
+                fs.unlinkSync(filePath);
+                console.log('Deleted profile image file:', filePath);
+            }
+        }
+
+        // Clear the profileImage from database
+        user.profileImage = null;
+        await user.save();
+
+        res.json({
+            message: 'Profile image deleted successfully',
+            user: {
+                id: user._id,
+                name: user.name,
+                email: user.email,
+                userType: user.userType,
+                profileImage: null
+            }
+        });
+    } catch (error) {
+        console.error('Delete profile image error:', error);
+        res.status(500).json({
+            error: 'Server error',
+            message: error.message || 'Unable to delete image. Please try again later.'
         });
     }
 });
