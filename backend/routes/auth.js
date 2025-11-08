@@ -571,4 +571,125 @@ router.delete('/profile-image', auth, async (req, res) => {
     }
 });
 
+// @route   POST /api/auth/upload-portfolio-image
+// @desc    Upload portfolio image for artist
+// @access  Private
+router.post('/upload-portfolio-image', auth, upload.single('portfolioImage'), async (req, res) => {
+    try {
+        if (!req.file) {
+            return res.status(400).json({
+                error: 'No file uploaded',
+                message: 'Please select an image file to upload'
+            });
+        }
+
+        const user = await User.findById(req.user.userId);
+        if (!user) {
+            return res.status(404).json({
+                error: 'User not found',
+                message: 'User account no longer exists'
+            });
+        }
+
+        // Only artists can upload portfolio images
+        if (user.userType !== 'artist') {
+            return res.status(403).json({
+                error: 'Forbidden',
+                message: 'Only artists can upload portfolio images'
+            });
+        }
+
+        // Initialize artistProfile if it doesn't exist
+        if (!user.artistProfile) {
+            user.artistProfile = {};
+        }
+
+        // Initialize portfolio array if it doesn't exist
+        if (!user.artistProfile.portfolio) {
+            user.artistProfile.portfolio = [];
+        }
+
+        // Store the file path as URL
+        const fileUrl = `/uploads/${req.file.filename}`;
+        user.artistProfile.portfolio.push(fileUrl);
+        await user.save();
+
+        // Get the full URL for the response
+        const protocol = req.protocol;
+        const host = req.get('host');
+        const fullUrl = `${protocol}://${host}${fileUrl}`;
+
+        res.json({
+            message: 'Portfolio image uploaded successfully',
+            imageUrl: fullUrl,
+            title: req.body.title || 'Makeup Look',
+            category: req.body.category || 'Portfolio'
+        });
+    } catch (error) {
+        console.error('Upload portfolio image error:', error);
+        res.status(500).json({
+            error: 'Server error',
+            message: error.message || 'Unable to upload image. Please try again later.'
+        });
+    }
+});
+
+// @route   GET /api/auth/artists
+// @desc    Get all artists (for client to browse)
+// @access  Public
+router.get('/artists', async (req, res) => {
+    try {
+        // Get all users with userType === 'artist'
+        const artists = await User.find({ userType: 'artist' }, {
+            _id: 1,
+            name: 1,
+            email: 1,
+            profileImage: 1,
+            'artistProfile.bio': 1,
+            'artistProfile.specialties': 1,
+            'artistProfile.portfolio': 1,
+            'artistProfile.pricing': 1,
+            'artistProfile.location': 1,
+            createdAt: 1
+        });
+
+        // Transform data for frontend
+        const transformedArtists = artists.map(artist => {
+            // Build full URL for profile image if it exists
+            let profileImage = artist.profileImage;
+            if (profileImage && profileImage.startsWith('/uploads/')) {
+                const protocol = req.protocol;
+                const host = req.get('host');
+                profileImage = `${protocol}://${host}${profileImage}`;
+            }
+
+            return {
+                id: artist._id.toString(),
+                name: artist.name,
+                email: artist.email,
+                specialties: artist.artistProfile?.specialties || ['Bridal Makeup', 'Event Makeup'],
+                rating: 4.9, // TODO: Calculate from reviews when review system is implemented
+                reviewCount: 0, // TODO: Count reviews
+                hourlyRate: artist.artistProfile?.pricing?.consultation || 100,
+                location: artist.artistProfile?.location?.city || 'New York, NY',
+                bio: artist.artistProfile?.bio || 'Professional makeup artist',
+                image: profileImage || '/api/placeholder/300/300',
+                portfolioImages: artist.artistProfile?.portfolio || [],
+                timeSlots: []
+            };
+        });
+
+        res.json({
+            message: 'Artists retrieved successfully',
+            artists: transformedArtists
+        });
+    } catch (error) {
+        console.error('Get artists error:', error);
+        res.status(500).json({
+            error: 'Server error',
+            message: error.message || 'Unable to retrieve artists. Please try again later.'
+        });
+    }
+});
+
 module.exports = router;

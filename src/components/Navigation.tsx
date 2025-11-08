@@ -64,13 +64,24 @@ const Navigation = () => {
 
           {/* Social Links & CTA */}
           <div className="hidden lg:flex items-center space-x-4">
-            <a href="#" className="text-foreground hover:text-primary transition-colors">
+            <a
+              href="https://instagram.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-foreground hover:text-primary transition-colors"
+            >
               <Instagram className="w-5 h-5" />
             </a>
-            <a href="#" className="text-foreground hover:text-primary transition-colors">
+            <a
+              href="tel:+1(555)123-4567"
+              className="text-foreground hover:text-primary transition-colors"
+            >
               <Phone className="w-5 h-5" />
             </a>
-            <a href="#" className="text-foreground hover:text-primary transition-colors">
+            <a
+              href="mailto:hello@bellaartistry.com"
+              className="text-foreground hover:text-primary transition-colors"
+            >
               <Mail className="w-5 h-5" />
             </a>
             {showBookNowButton && (
@@ -110,13 +121,24 @@ const Navigation = () => {
                 </Link>
               ))}
               <div className="flex items-center space-x-4 pt-4">
-                <a href="#" className="text-foreground hover:text-primary transition-colors">
+                <a
+                  href="https://instagram.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-foreground hover:text-primary transition-colors"
+                >
                   <Instagram className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-foreground hover:text-primary transition-colors">
+                <a
+                  href="tel:+1(555)123-4567"
+                  className="text-foreground hover:text-primary transition-colors"
+                >
                   <Phone className="w-5 h-5" />
                 </a>
-                <a href="#" className="text-foreground hover:text-primary transition-colors">
+                <a
+                  href="mailto:hello@bellaartistry.com"
+                  className="text-foreground hover:text-primary transition-colors"
+                >
                   <Mail className="w-5 h-5" />
                 </a>
               </div>

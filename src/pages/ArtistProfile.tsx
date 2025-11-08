@@ -11,6 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import { useAuth } from "@/contexts/AuthContext";
 import { PhotoUpload } from "@/components/PhotoUpload";
 import {
@@ -30,13 +31,29 @@ import {
     Users,
     TrendingUp,
     Image as ImageIcon,
-    Plus
+    Plus,
+    AlertCircle
 } from "lucide-react";
 import { useEffect } from "react";
+import portfolio1 from "@/assets/portfolio-1.jpg";
+import portfolio2 from "@/assets/portfolio-2.jpg";
+import portfolio3 from "@/assets/portfolio-3.jpg";
+import { useRef } from "react";
+
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
 
 const ArtistProfile = () => {
     const { user, updateProfile } = useAuth();
     const [isEditing, setIsEditing] = useState(false);
+    const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
+    const [portfolioError, setPortfolioError] = useState<string | null>(null);
+    const portfolioInputRef = useRef<HTMLInputElement>(null);
+    const [portfolioImages, setPortfolioImages] = useState([
+        { id: 1, title: "Bridal Look", image: portfolio1, category: "Bridal" },
+        { id: 2, title: "Evening Glam", image: portfolio2, category: "Evening" },
+        { id: 3, title: "Natural Beauty", image: portfolio3, category: "Natural" },
+        { id: 4, title: "Editorial", image: portfolio1, category: "Fashion" }
+    ]);
     const [formData, setFormData] = useState({
         name: user?.name || "",
         email: user?.email || "",
@@ -80,6 +97,78 @@ const ArtistProfile = () => {
         setIsEditing(false);
     };
 
+    const handlePortfolioFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        // Validate file type
+        const validTypes = ['image/jpeg', 'image/png', 'image/gif', 'image/webp'];
+        if (!validTypes.includes(file.type)) {
+            setPortfolioError('Please select a valid image file (JPEG, PNG, GIF, or WebP)');
+            return;
+        }
+
+        // Validate file size (10MB limit for portfolio)
+        if (file.size > 10 * 1024 * 1024) {
+            setPortfolioError('Image size must be less than 10MB');
+            return;
+        }
+
+        handlePortfolioUpload(file);
+    };
+
+    const handlePortfolioUpload = async (file: File) => {
+        setIsUploadingPortfolio(true);
+        setPortfolioError(null);
+
+        try {
+            const formData = new FormData();
+            formData.append('portfolioImage', file);
+            formData.append('title', `Makeup Look ${portfolioImages.length + 1}`);
+            formData.append('category', 'Portfolio');
+
+            const token = localStorage.getItem("makeup-artist-token");
+            const response = await fetch(`${API_BASE_URL}/auth/upload-portfolio-image`, {
+                method: 'POST',
+                headers: {
+                    'Authorization': `Bearer ${token}`,
+                },
+                body: formData,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                setPortfolioError(data.error || 'Failed to upload portfolio image');
+                return;
+            }
+
+            // Add new image to portfolio
+            const newImage = {
+                id: portfolioImages.length + 1,
+                title: data.title,
+                image: data.imageUrl,
+                category: data.category
+            };
+
+            setPortfolioImages([...portfolioImages, newImage]);
+
+            // Reset input
+            if (portfolioInputRef.current) {
+                portfolioInputRef.current.value = '';
+            }
+        } catch (err) {
+            setPortfolioError('An error occurred during upload');
+            console.error('Portfolio upload error:', err);
+        } finally {
+            setIsUploadingPortfolio(false);
+        }
+    };
+
+    const handleDeletePortfolioImage = (id: number) => {
+        setPortfolioImages(portfolioImages.filter(img => img.id !== id));
+    };
+
     const getUserInitials = (name?: string, email?: string) => {
         if (name) {
             return name.split(' ').map(n => n[0]).join('').toUpperCase();
@@ -107,13 +196,6 @@ const ArtistProfile = () => {
             price: "$180",
             status: "pending"
         }
-    ];
-
-    const portfolioImages = [
-        { id: 1, title: "Bridal Look", image: "/api/placeholder/200/200", category: "Bridal" },
-        { id: 2, title: "Evening Glam", image: "/api/placeholder/200/200", category: "Evening" },
-        { id: 3, title: "Natural Beauty", image: "/api/placeholder/200/200", category: "Natural" },
-        { id: 4, title: "Editorial", image: "/api/placeholder/200/200", category: "Fashion" }
     ];
 
     const stats = {
@@ -441,12 +523,31 @@ const ArtistProfile = () => {
                                                 <CardTitle>Portfolio</CardTitle>
                                                 <CardDescription>Showcase your best work</CardDescription>
                                             </div>
-                                            <Button variant="outline" size="sm">
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                onClick={() => portfolioInputRef.current?.click()}
+                                                disabled={isUploadingPortfolio}
+                                            >
                                                 <Plus className="w-4 h-4 mr-2" />
-                                                Add Photo
+                                                {isUploadingPortfolio ? 'Uploading...' : 'Add Photo'}
                                             </Button>
+                                            <input
+                                                ref={portfolioInputRef}
+                                                type="file"
+                                                accept="image/*"
+                                                className="hidden"
+                                                onChange={handlePortfolioFileSelect}
+                                                disabled={isUploadingPortfolio}
+                                            />
                                         </CardHeader>
                                         <CardContent>
+                                            {portfolioError && (
+                                                <Alert variant="destructive" className="mb-4">
+                                                    <AlertCircle className="h-4 w-4" />
+                                                    <AlertDescription>{portfolioError}</AlertDescription>
+                                                </Alert>
+                                            )}
                                             <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                                                 {portfolioImages.map((item) => (
                                                     <div key={item.id} className="group relative aspect-square rounded-lg overflow-hidden bg-primary/5 border border-primary/10">
@@ -459,11 +560,22 @@ const ArtistProfile = () => {
                                                             <div className="text-center text-white">
                                                                 <h4 className="font-semibold">{item.title}</h4>
                                                                 <p className="text-sm">{item.category}</p>
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="destructive"
+                                                                    className="mt-2"
+                                                                    onClick={() => handleDeletePortfolioImage(item.id)}
+                                                                >
+                                                                    Delete
+                                                                </Button>
                                                             </div>
                                                         </div>
                                                     </div>
                                                 ))}
-                                                <div className="aspect-square rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer">
+                                                <div
+                                                    className="aspect-square rounded-lg border-2 border-dashed border-primary/30 flex items-center justify-center bg-primary/5 hover:bg-primary/10 transition-colors cursor-pointer"
+                                                    onClick={() => portfolioInputRef.current?.click()}
+                                                >
                                                     <div className="text-center text-muted-foreground">
                                                         <ImageIcon className="w-8 h-8 mx-auto mb-2" />
                                                         <p className="text-sm">Add Photo</p>
