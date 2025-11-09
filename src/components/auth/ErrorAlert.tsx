@@ -19,11 +19,11 @@ export const ErrorAlert = ({
     }
 
     return (
-        <Alert variant="destructive" className="border-red-500/50 bg-red-50 dark:bg-red-950/30">
-            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400" />
+        <Alert variant="destructive" className="border-red-500/50 bg-red-50 dark:bg-red-950/30 overflow-hidden">
+            <AlertCircle className="h-4 w-4 text-red-600 dark:text-red-400 flex-shrink-0" />
             <AlertTitle className="text-red-900 dark:text-red-300">{title}</AlertTitle>
             <AlertDescription className="text-red-800 dark:text-red-200">
-                <div className="space-y-2">
+                <div className="space-y-2 max-h-64 overflow-y-auto pr-2">
                     <p>{error}</p>
                     {details && details.length > 0 && (
                         <ul className="list-disc list-inside space-y-1 text-sm">
