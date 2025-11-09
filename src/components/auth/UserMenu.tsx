@@ -98,11 +98,11 @@ const UserMenu = () => {
                         <>
                             <DropdownMenuItem className="cursor-pointer">
                                 <Calendar className="mr-2 h-4 w-4" />
-                                <span>My Bookings</span>
+                                <Link to="/dashboard/client?tab=bookings">My Bookings</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer">
                                 <Heart className="mr-2 h-4 w-4" />
-                                <span>Favorites</span>
+                                <Link to="/dashboard/client?tab=favorites">Favorites</Link>
                             </DropdownMenuItem>
                         </>
                     )}
@@ -111,11 +111,11 @@ const UserMenu = () => {
                         <>
                             <DropdownMenuItem className="cursor-pointer">
                                 <Calendar className="mr-2 h-4 w-4" />
-                                <Link to="/dashboard/artist">Manage Bookings</Link>
+                                <Link to="/dashboard/artist?tab=bookings">Manage Bookings</Link>
                             </DropdownMenuItem>
                             <DropdownMenuItem className="cursor-pointer">
                                 <Palette className="mr-2 h-4 w-4" />
-                                <Link to="/dashboard/artist">Portfolio Manager</Link>
+                                <Link to="/profile/artist?tab=portfolio">Portfolio Manager</Link>
                             </DropdownMenuItem>
                         </>
                     )}

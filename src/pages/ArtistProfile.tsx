@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useSearchParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -34,7 +34,6 @@ import {
     Plus,
     AlertCircle
 } from "lucide-react";
-import { useEffect } from "react";
 import portfolio1 from "@/assets/portfolio-1.jpg";
 import portfolio2 from "@/assets/portfolio-2.jpg";
 import portfolio3 from "@/assets/portfolio-3.jpg";
@@ -44,9 +43,11 @@ const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api'
 
 const ArtistProfile = () => {
     const { user, updateProfile } = useAuth();
+    const [searchParams] = useSearchParams();
     const [isEditing, setIsEditing] = useState(false);
     const [isUploadingPortfolio, setIsUploadingPortfolio] = useState(false);
     const [portfolioError, setPortfolioError] = useState<string | null>(null);
+    const [activeTab, setActiveTab] = useState("info");
     const portfolioInputRef = useRef<HTMLInputElement>(null);
     const [portfolioImages, setPortfolioImages] = useState([
         { id: 1, title: "Bridal Look", image: portfolio1, category: "Bridal" },
@@ -66,6 +67,14 @@ const ArtistProfile = () => {
         instagram: "",
         website: ""
     });
+
+    // Set active tab from URL params on mount or when params change
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && ['info', 'bookings', 'portfolio'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     // Sync form data when user data changes
     useEffect(() => {
@@ -313,7 +322,7 @@ const ArtistProfile = () => {
 
                         {/* Main Content */}
                         <div className="lg:col-span-2">
-                            <Tabs defaultValue="info" className="space-y-6">
+                            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                                 <TabsList className="grid grid-cols-3 w-full glass">
                                     <TabsTrigger value="info">Professional Info</TabsTrigger>
                                     <TabsTrigger value="bookings">Bookings</TabsTrigger>

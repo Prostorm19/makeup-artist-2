@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -59,6 +59,7 @@ interface Review {
 
 const ClientDashboard = () => {
   const { user } = useAuth();
+  const [searchParams] = useSearchParams();
   const [activeTab, setActiveTab] = useState("bookings");
   const [isBookingModalOpen, setIsBookingModalOpen] = useState(false);
   const [selectedArtist, setSelectedArtist] = useState<Artist | null>(null);
@@ -91,6 +92,14 @@ const ClientDashboard = () => {
 
   // API base URL
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
+
+  // Set active tab from URL params on mount or when params change
+  useEffect(() => {
+    const tab = searchParams.get('tab');
+    if (tab && ['bookings', 'artists', 'favorites', 'reviews'].includes(tab)) {
+      setActiveTab(tab);
+    }
+  }, [searchParams]);
 
   // Load artists from backend when component mounts
   useEffect(() => {

@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import Navigation from "@/components/Navigation";
 import Footer from "@/components/Footer";
 import { Button } from "@/components/ui/button";
@@ -39,6 +39,7 @@ interface Review {
 
 const ArtistDashboard = () => {
     const { user } = useAuth();
+    const [searchParams] = useSearchParams();
     const [activeTab, setActiveTab] = useState("schedule");
     const [isAddSlotOpen, setIsAddSlotOpen] = useState(false);
     const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
@@ -128,6 +129,14 @@ const ArtistDashboard = () => {
     ];
 
     const [reviews, setReviews] = useState<Review[]>(staticReviews);
+
+    // Set active tab from URL params on mount or when params change
+    useEffect(() => {
+        const tab = searchParams.get('tab');
+        if (tab && ['schedule', 'bookings', 'reviews'].includes(tab)) {
+            setActiveTab(tab);
+        }
+    }, [searchParams]);
 
     // Load reviews from dataService and combine with static reviews
     useEffect(() => {

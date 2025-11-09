@@ -1,17 +1,20 @@
 import { Button } from "@/components/ui/button";
 import { ArrowRight, Star } from "lucide-react";
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import LoginModal from "@/components/auth/LoginModal";
 import heroImage from "@/assets/hero-image.jpg";
 
 const Hero = () => {
   const navigate = useNavigate();
   const { isAuthenticated, userType } = useAuth();
+  const [showLoginModal, setShowLoginModal] = useState(false);
 
   const handleBookSession = () => {
     if (!isAuthenticated) {
-      // If not authenticated, navigate to home where they can sign up
-      navigate('/');
+      // If not authenticated, show the login/signup modal
+      setShowLoginModal(true);
     } else if (userType === 'client') {
       // If client, navigate to their dashboard to browse artists
       navigate('/dashboard/client');
@@ -88,6 +91,11 @@ const Hero = () => {
           <div className="w-1 h-3 bg-primary rounded-full mt-2 animate-pulse"></div>
         </div>
       </div>
+
+      <LoginModal
+        isOpen={showLoginModal}
+        onClose={() => setShowLoginModal(false)}
+      />
     </section>
   );
 };
